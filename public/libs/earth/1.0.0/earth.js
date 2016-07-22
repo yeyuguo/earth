@@ -392,11 +392,16 @@
         return "ready";
     }
 
+
+
+
+
+    // 创建的蒙板 svg#map
     function createMask(globe) {
         if (!globe) return null;
 
         log.time("render mask");
-        
+
 
         // Create a detached canvas, ask the model to define the mask polygon, then fill with an opaque color.
         var width = view.width, height = view.height;
