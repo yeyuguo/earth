@@ -153,7 +153,7 @@ var globes = function() {
                     move: function(mouse, scale) {
                         if (mouse) {
                             // mouse is  x,y in the coordinary! 点击后鼠标所在 xy 轴上的位置
-                            console.log('globes.js manipulator mouse:',mouse)
+                            // console.log('globes.js manipulator mouse:',mouse)
                             var xd = mouse[0] - startMouse[0] + rotation[0];
                             var yd = mouse[1] - startMouse[1] + rotation[1];
                             // 重置最新的 rotate, 控制着 拖动后 重新加载整个投影效果
@@ -189,7 +189,7 @@ var globes = function() {
              * @param mapSvg the primary map SVG container.
              * @param foregroundSvg the foreground SVG container.
              */
-             // 绘制 d3.geo.paath() 地图层上的 SVG 
+             // 绘制 d3.geo.path() 地图层上的 SVG 
             defineMap: function(mapSvg, foregroundSvg) {
                 console.log('globes.js defineMap projection:',this.projection);
                 var path = d3.geo.path().projection(this.projection);

@@ -475,11 +475,14 @@ var µ = function() {
 
             try {
                 // When all arguments are resolved, invoke the task then either accept or reject the result.
+                // taskAndArguments[0] == task 是传入的 函数名
                 var task = taskAndArguments[0];
                 // taskAndArguments,第一个元素是函数体，其余元素是参数，
                 // _.rest() 返回数组中除了第一个元素外的其他全部元素
                 when.all(_.rest(taskAndArguments)).then(run).then(accept, reject).done(undefined, fail);
                 // console.log('yes,submit again!!')
+                // 触发的 submit 事件 ==> backbone: trigger(event,[*args]) 触发给定 event 事件的回调函数,传入 trigger 的参数会传递到触发事件的回调函数里
+                console.log('micro.js newAgent() agent:',agent)
                 agent.trigger("submit", agent);
             } catch (err) {
                 fail(err);
@@ -488,6 +491,7 @@ var µ = function() {
 
         var value = initial;
         var runTask_debounced = _.debounce(runTask, 0);  // ignore multiple simultaneous submissions--reduces noise
+        // agent 把所有事件绑定在 backbone 监听
         var agent = {
 
             /**

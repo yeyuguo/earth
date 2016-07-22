@@ -306,13 +306,16 @@
         log.time("rendering map");
 
         // UNDONE: better way to do the following?
+        
         var dispatch = _.clone(Backbone.Events);
+        // 暂停上一个事件状态的监听
         if (rendererAgent._previous) {
             rendererAgent._previous.stopListening();
         }
         rendererAgent._previous = dispatch;
 
         // First clear map and foreground svg contents.
+        // removeChildren() 简单封装选择了第一个 element[0] 删除而已
         µ.removeChildren(d3.select("#map").node());
         µ.removeChildren(d3.select("#foreground").node());
         // Create new map svg elements.
@@ -322,7 +325,7 @@
         var coastline = d3.select(".coastline");
         var lakes = d3.select(".lakes");
         d3.selectAll("path").attr("d", path);  // do an initial draw -- fixes issue with safari
-        // 如果定义后，在地图上展示位置
+        // 地图上点击后，出现圆圈 展示位置，参数是同时给出 (x,y) 和 (l,on lat)
         function drawLocationMark(point, coord) {
             // show the location on the map if defined
             console.log('earth.js drawLocationMark fieldAgent.value():',fieldAgent.value())
@@ -336,7 +339,9 @@
                 if (!mark.node()) {
                     mark = d3.select("#foreground").append("path").attr("class", "location-mark");
                 }
+                
                 mark.datum({type: "Point", coordinates: coord}).attr("d", path);
+                console.log('earth.js buildRenderer() drawLocationMark() 点击点的 mark.datum:',mark.datum({type: "Point", coordinates: coord}).attr("d", path))
             }
         }
 
@@ -356,6 +361,8 @@
         }
 
         // Attach to map rendering events on input controller.
+        /*********************/
+        // 这里就是控制鼠标拖动图层移动的代码
         dispatch.listenTo(
             inputController, {
                 moveStart: function() {
@@ -374,7 +381,7 @@
                 },
                 click: drawLocationMark
             });
-
+        /*********************/
         // Finally, inject the globe model into the input controller. Do it on the next event turn to ensure
         // renderer is fully set up before events start flowing.
         when(true).then(function() {
@@ -389,6 +396,7 @@
         if (!globe) return null;
 
         log.time("render mask");
+        
 
         // Create a detached canvas, ask the model to define the mask polygon, then fill with an opaque color.
         var width = view.width, height = view.height;
@@ -723,6 +731,7 @@
      *         This function would simplify nicely.
      */
     function validityDate(grids) {
+        console.log('earth.js validityDate grids:',grids)
         // When the active layer is considered "current", use its time as now, otherwise use current time as
         // now (but rounded down to the nearest three-hour block).
         var THREE_HOURS = 3 * HOUR;
@@ -998,7 +1007,7 @@
                 console.log('earth.js init() grids:',grids)
                 if (!overlay) {
                     // Do a rebuild if we have no overlay grid.
-                    // 执行这步
+                    // 选择执行了这步
                     console.log('yes,overlay is undefined')
                     rebuildRequired = true;
                 }
