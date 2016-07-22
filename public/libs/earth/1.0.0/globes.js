@@ -6,6 +6,7 @@
  *
  * https://github.com/cambecc/earth
  */
+ //  球体投影
 var globes = function() {
     "use strict";
 
@@ -41,11 +42,13 @@ var globes = function() {
      * Returns a globe object with standard behavior. At least the newProjection method must be overridden to
      * be functional.
      */
+     //  球体投影绘制
     function standardGlobe() {
         return {
             /**
              * This globe's current D3 projection.
              */
+            // projection: null,
             projection: null,
 
             /**
@@ -99,6 +102,7 @@ var globes = function() {
              * @param [o] the orientation string
              * @param [view] the size of the view as {width:, height:}.
              */
+             // orientation 属性值，eg : orientation: "-99.50,0.49,144"
             orientation: function(o, view) {
                 var projection = this.projection, rotate = projection.rotate();
                 if (µ.isValue(o)) {
@@ -122,17 +126,37 @@ var globes = function() {
              * @param startMouse starting mouse position.
              * @param startScale starting scale.
              */
+             // 鼠标缩放 
             manipulator: function(startMouse, startScale) {
+                // startMouse is x,y in the coordinary !
+                //eg: globes.js manipulator startMouse: [0, 213],  startScale : 574
+                // console.log('globes.js manipulator startMouse:',startMouse)
+                console.log('globes.js manipulator startScale:',startScale)
+                console.log('globes.js manipulator.projection:',this.projection)
+                console.log('globes.js manipulator.projection.rotate :',this.projection.rotate())
+                console.log('globes.js manipulator.projection.precision :',this.projection.precision())
+                // projection ===> eg: 
+                // function projection(point) {
+                //   point = projectRotate(point[0] * d3_radians, point[1] * d3_radians);
+                //   return [ point[0] * k + δx, δy - point[1] * k ];
+                // }
                 var projection = this.projection;
+                // 缩放的因子数 eg：　startScale = 574
                 var sensitivity = 60 / startScale;  // seems to provide a good drag scaling factor
+                // projection.rotate() ==> eg : [259.85, 15.85, 0], rotate详解 https://github.com/d3/d3-geo/blob/master/README.md#projection_rotate
                 var rotation = [projection.rotate()[0] / sensitivity, -projection.rotate()[1] / sensitivity];
+                // projection.precision()  ===> eg : 0.1
                 var original = projection.precision();
                 projection.precision(original * 10);
                 return {
+                    // earth.js line:115 调用
                     move: function(mouse, scale) {
                         if (mouse) {
+                            // mouse is  x,y in the coordinary! 点击后鼠标所在 xy 轴上的位置
+                            console.log('globes.js manipulator mouse:',mouse)
                             var xd = mouse[0] - startMouse[0] + rotation[0];
                             var yd = mouse[1] - startMouse[1] + rotation[1];
+                            // 重置最新的 rotate, 控制着 拖动后 重新加载整个投影效果
                             projection.rotate([xd * sensitivity, -yd * sensitivity, projection.rotate()[2]]);
                         }
                         projection.scale(scale);
@@ -165,7 +189,9 @@ var globes = function() {
              * @param mapSvg the primary map SVG container.
              * @param foregroundSvg the foreground SVG container.
              */
+             // 绘制 d3.geo.paath() 地图层上的 SVG 
             defineMap: function(mapSvg, foregroundSvg) {
+                console.log('globes.js defineMap projection:',this.projection);
                 var path = d3.geo.path().projection(this.projection);
                 var defs = mapSvg.append("defs");
                 defs.append("path")
@@ -194,6 +220,7 @@ var globes = function() {
         };
     }
 
+//  给 投影模式source 增加属性view
     function newGlobe(source, view) {
         var result = _.extend(standardGlobe(), source);
         result.projection = result.newProjection(view);
@@ -201,6 +228,8 @@ var globes = function() {
     }
 
     // ============================================================================================
+
+    // 下列都是投影模式计算函数
 
     function atlantis() {
         return newGlobe({
@@ -228,7 +257,7 @@ var globes = function() {
             }
         });
     }
-
+    // 目标投影效果
     function equirectangular() {
         return newGlobe({
             newProjection: function() {
@@ -342,7 +371,7 @@ var globes = function() {
         atlantis: atlantis,
         azimuthal_equidistant: azimuthalEquidistant,
         conic_equidistant: conicEquidistant,
-        equirectangular: equirectangular,
+        equirectangular: equirectangular,  // 投影模式 
         orthographic: orthographic,
         stereographic: stereographic,
         waterman: waterman,

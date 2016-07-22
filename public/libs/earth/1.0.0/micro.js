@@ -6,12 +6,15 @@
  *
  * https://github.com/cambecc/earth
  */
+ // 解析 URL 传入参数加载不同的图像
 var µ = function() {
     "use strict";
 
     var τ = 2 * Math.PI;
     var H = 0.0000360;  // 0.0000360°φ ~= 4m
-    var DEFAULT_CONFIG = "current/wind/surface/level/orthographic";
+    // var DEFAULT_CONFIG = "current/wind/surface/level/orthographic";
+    // 目标投影
+    var DEFAULT_CONFIG = "current/wind/surface/level/equirectangular";
     var TOPOLOGY = isMobile() ? "/data/earth-topo-mobile.json?v2" : "/data/earth-topo.json?v2";
 
     /**
@@ -67,6 +70,7 @@ var µ = function() {
      *          bounds. For example, given bounds=[10, 20], this method returns 1 for x>=20, 0.5 for x=15 and 0
      *          for x<=10.
      */
+     // 返回数值是 >=1
     function proportion(x, low, high) {
         return (µ.clamp(x, low, high) - low) / (high - low);
     }
@@ -107,8 +111,12 @@ var µ = function() {
     function isMobile() {
         return (/android|blackberry|iemobile|ipad|iphone|ipod|opera mini|webos/i).test(navigator.userAgent);
     }
-
-    function isEmbeddedInIFrame() {
+    // 判断是否嵌套
+    function isEmbeddedInIFrame() {        
+        console.log('micro.js isEmbeddedInIFrame() window:',window)
+        console.log('micro.js isEmbeddedInIFrame() window.top:',window.top);
+        console.log('micro.js isEmbeddedInIFrame()',window != window.top);
+        // window.top 是浏览器最顶端的窗体，window 代表当前窗口的对象
         return window != window.top;
     }
 
@@ -192,7 +200,7 @@ var µ = function() {
         canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
         return canvas;
     }
-
+// 颜色变化区间
     function colorInterpolator(start, end) {
         var r = start[0], g = start[1], b = start[2];
         var Δr = end[0] - r, Δg = end[1] - g, Δb = end[2] - b;
@@ -246,11 +254,13 @@ var µ = function() {
     /**
      * @returns {Array} of wind colors and a method, indexFor, that maps wind magnitude to an index on the color scale.
      */
+     // 风速的颜色区域  wind color
     function windIntensityColorScale(step, maxWind) {
         var result = [];
         for (var j = 85; j <= 255; j += step) {
             result.push(asColorStyle(j, j, j, 1.0));
         }
+        // 获取 m 值风速，在所有风速样式中所在的样式值
         result.indexFor = function(m) {  // map wind speed to a style
             return Math.floor(Math.min(m, maxWind) / maxWind * (result.length - 1));
         };
@@ -258,7 +268,7 @@ var µ = function() {
     }
 
     /**
-     * Creates a color scale composed of the specified segments. Segments is an array of two-element arrays of the
+     * Creates a color scale composed of the specified segments(分割,部分). Segments is an array of two-element arrays of the
      * form [value, color], where value is the point along the scale and color is the [r, g, b] color at that point.
      * For example, the following creates a scale that smoothly transitions from red to green to blue along the
      * points 0.5, 1.0, and 3.5:
@@ -270,22 +280,27 @@ var µ = function() {
      * @param segments array of color segments
      * @returns {Function} a function(point, alpha) that returns the color [r, g, b, alpha] for the given point.
      */
+     // 数值与颜色值拼成二维数组   参数 segments 也是二维数组
     function segmentedColorScale(segments) {
+        // interpolators 篡改者，插入器
         var points = [], interpolators = [], ranges = [];
         for (var i = 0; i < segments.length - 1; i++) {
-            points.push(segments[i+1][0]);
+            points.push(segments[i+1][0]);  // segments[:,0]
+            // interpolators 存储的是颜色值 数组
             interpolators.push(colorInterpolator(segments[i][1], segments[i+1][1]));
             ranges.push([segments[i][0], segments[i+1][0]]);
         }
 
         return function(point, alpha) {
             var i;
+            //  返回 point小于 points[i] 的 i 所在位置，给后面函数计算
             for (i = 0; i < points.length - 1; i++) {
                 if (point <= points[i]) {
                     break;
                 }
             }
             var range = ranges[i];
+            // 位置 i 所在 interpolators 的颜色值 ，proportion 返回的是 >=1 的数值 ，range[0] range[1] 分别是 i 与  i+1 位置
             return interpolators[i](µ.proportion(point, range[0], range[1]), alpha);
         };
     }
@@ -301,6 +316,7 @@ var µ = function() {
     /**
      * Returns a human readable string for the provided scalar in the given units.
      */
+     // 格式化标量
     function formatScalar(value, units) {
         return units.conversion(value).toFixed(units.precision);
     }
@@ -309,6 +325,8 @@ var µ = function() {
      * Returns a human readable string for the provided rectangular wind vector in the given units.
      * See http://mst.nerc.ac.uk/wind_vect_convs.html.
      */
+
+     // 格式化矢量   eg : 175° @ 5 km/h
     function formatVector(wind, units) {
         var d = Math.atan2(-wind[0], -wind[1]) / τ * 360;  // calculate into-the-wind cardinal degrees
         var wd = Math.round((d + 360) % 360 / 5) * 5;  // shift [-180, 180] to [0, 360], and round to nearest 5.
@@ -381,7 +399,8 @@ var µ = function() {
      * progress, the earlier task is cancelled and its result ignored. Evaluation of a task may even be skipped
      * entirely if cancellation occurs early enough.
      *
-     * Agents are Backbone.js Event emitters. When a submitted task is accepted for invocation by an agent, a
+     * --------------------------->   Agents are Backbone.js Event emitters.   <-----------------------
+     * When a submitted task is accepted for invocation by an agent, a
      * "submit" event is emitted. This event has the agent as its sole argument. When a task finishes and
      * the agent's value changes, an "update" event is emitted, providing (value, agent) as arguments. If a task
      * fails by either throwing an exception or rejecting a promise, a "reject" event having arguments (err, agent)
@@ -411,6 +430,7 @@ var µ = function() {
      * @param [initial] initial value of the agent, if any
      * @returns {Object}
      */
+
     function newAgent(initial) {
 
         /**
@@ -431,6 +451,8 @@ var µ = function() {
         function runTask(cancel, taskAndArguments) {
 
             function run(args) {
+                // _.isFunction() 如果object是一个函数（Function），返回true
+                 // apply() 函数把 task 函数作用域变成 agent 的作用域
                 return cancel.requested ? null : _.isFunction(task) ? task.apply(agent, args) : task;
             }
 
@@ -454,7 +476,10 @@ var µ = function() {
             try {
                 // When all arguments are resolved, invoke the task then either accept or reject the result.
                 var task = taskAndArguments[0];
+                // taskAndArguments,第一个元素是函数体，其余元素是参数，
+                // _.rest() 返回数组中除了第一个元素外的其他全部元素
                 when.all(_.rest(taskAndArguments)).then(run).then(accept, reject).done(undefined, fail);
+                // console.log('yes,submit again!!')
                 agent.trigger("submit", agent);
             } catch (err) {
                 fail(err);
@@ -558,16 +583,20 @@ var µ = function() {
      * A Backbone.js Model that persists its attributes as a human readable URL hash fragment. Loading from and
      * storing to the hash fragment is handled by the sync method.
      */
+
+    // Backbone.Model 监测 参数的变化
     var Configuration = Backbone.Model.extend({
+
         id: 0,
         _ignoreNextHashChangeEvent: false,
         _projectionNames: null,
         _overlayTypes: null,
 
         /**
-         * @returns {String} this configuration converted to a hash fragment.
+         * @returns {String} this configuration converted to a hash fragment(碎片).
          */
         toHash: function() {
+            console.log('Configuration.toHash attr:',this.attributes)
             var attr = this.attributes;
             var dir = attr.date === "current" ? "current" : attr.date + "/" + attr.hour + "Z";
             var proj = [attr.projection, attr.orientation].filter(isTruthy).join("=");
@@ -587,6 +616,7 @@ var µ = function() {
                         model._ignoreNextHashChangeEvent = false;
                         return;
                     }
+                    // var DEFAULT_CONFIG = "current/wind/surface/level/orthographic";
                     model.set(parse(
                         window.location.hash.substr(1) || DEFAULT_CONFIG,
                         model._projectionNames,
@@ -613,6 +643,8 @@ var µ = function() {
      * @returns {Configuration} Model to represent the hash fragment, using the specified set of allowed projections.
      */
     function buildConfiguration(projectionNames, overlayTypes) {
+        console.log('micro.js buildConfiguration projectionNames is:',projectionNames)
+        console.log('micro.js buildConfiguration overLayTypes is:',overlayTypes)
         var result = new Configuration();
         result._projectionNames = projectionNames;
         result._overlayTypes = overlayTypes;

@@ -8,6 +8,10 @@
  */
 (function() {
     "use strict";
+    
+
+
+
 
     var SECOND = 1000;
     var MINUTE = 60 * SECOND;
@@ -15,10 +19,12 @@
     var MAX_TASK_TIME = 100;                  // amount of time before a task yields control (millis)
     var MIN_SLEEP_TIME = 25;                  // amount of time a task waits before resuming (millis)
     var MIN_MOVE = 4;                         // slack before a drag operation beings (pixels)
-    var MOVE_END_WAIT = 1000;                 // time to wait for a move operation to be considered done (millis)
+    // 默认值是 1000 (1s)
+    var MOVE_END_WAIT = 500;                 // time to wait for a move operation to be considered done (millis)
 
     var OVERLAY_ALPHA = Math.floor(0.4*255);  // overlay transparency (on scale [0, 255])
-    var INTENSITY_SCALE_STEP = 10;            // step size of particle intensity color scale
+    //var INTENSITY_SCALE_STEP = 10;            // step size of particle intensity color scale
+    var INTENSITY_SCALE_STEP = 20;            // step size of particle intensity color scale
     var MAX_PARTICLE_AGE = 100;               // max number of frames a particle is drawn before regeneration
     var PARTICLE_LINE_WIDTH = 1.0;            // line width of a drawn particle
     var PARTICLE_MULTIPLIER = 7;              // particle count scalar (completely arbitrary--this values looks nice)
@@ -55,6 +61,7 @@
             reset: function() {
                 return s.classed("bad", false).text("");
             },
+            // 进度条计算
             progress: function(amount) {  // amount of progress to report in the range [0, 1]
                 if (0 <= amount && amount < 1) {
                     var i = Math.ceil(amount * total);
@@ -119,7 +126,7 @@
                 manipulator: globe.manipulator(startMouse, startScale)
             };
         }
-
+// 用户做缩放行为的函数
         var zoom = d3.behavior.zoom()
             .on("zoomstart", function() {
                 op = op || newOp(d3.mouse(this), zoom.scale());  // a new operation begins
@@ -150,12 +157,13 @@
                 if (op.type === "click") {
                     dispatch.trigger("click", op.startMouse, globe.projection.invert(op.startMouse) || []);
                 }
+
                 else if (op.type !== "spurious") {
                     signalEnd();
                 }
                 op = null;  // the drag/zoom/click operation is over
             });
-
+        //  _.debounce 使正执行的函数在运行后一定时间才开始触发d ebounce 绑定的函数
         var signalEnd = _.debounce(function() {
             if (!op || op.type !== "drag" && op.type !== "zoom") {
                 configuration.save({orientation: globe.orientation()}, {source: "moveEnd"});
@@ -191,7 +199,7 @@
             zoom.scale(globe.projection.scale());
             dispatch.trigger("moveEnd");
         }
-
+        // 重绘变化方向
         var dispatch = _.extend({
             globe: function(_) {
                 if (_) {
@@ -209,23 +217,34 @@
      * @param resource the GeoJSON resource's URL
      * @returns {Object} a promise for GeoJSON topology features: {boundaryLo:, boundaryHi:}
      */
+
     function buildMesh(resource) {
+        console.log('earth.js buildMes() resource(加载地形数据):',resource)
         var cancel = this.cancel;
         report.status("Downloading...");
         return µ.loadJson(resource).then(function(topo) {
             if (cancel.requested) return null;
             log.time("building meshes");
             var o = topo.objects;
-            var coastLo = topojson.feature(topo, µ.isMobile() ? o.coastline_tiny : o.coastline_110m);
-            var coastHi = topojson.feature(topo, µ.isMobile() ? o.coastline_110m : o.coastline_50m);
-            var lakesLo = topojson.feature(topo, µ.isMobile() ? o.lakes_tiny : o.lakes_110m);
-            var lakesHi = topojson.feature(topo, µ.isMobile() ? o.lakes_110m : o.lakes_50m);
+            // console.log(topo)
+            // console.log(topo.objects)
+            // var coastLo = topojson.feature(topo, µ.isMobile() ? o.coastline_tiny : o.coastline_110m);
+            // var coastHi = topojson.feature(topo, µ.isMobile() ? o.coastline_110m : o.coastline_50m);
+            // var lakesLo = topojson.feature(topo, µ.isMobile() ? o.lakes_tiny : o.lakes_110m);
+            // var lakesHi = topojson.feature(topo, µ.isMobile() ? o.lakes_110m : o.lakes_50m);
+
+            var China_Province_pl = topojson.feature(topo, o.China_Province_pl);
+            // var coastHi = topojson.feature(topo, o.China_Province_pl);
+            // var lakesLo = topojson.feature(topo, o.China_Province_pl);
+            // var lakesHi = topojson.feature(topo, o.China_Province_pl);
             log.timeEnd("building meshes");
             return {
-                coastLo: coastLo,
-                coastHi: coastHi,
-                lakesLo: lakesLo,
-                lakesHi: lakesHi
+                // coastLo: China_Province_pl,
+                coastHi:China_Province_pl
+                // coastLo: coastLo,
+                // coastHi: coastHi,
+                // lakesLo: lakesLo,
+                // lakesHi: lakesHi
             };
         });
     }
@@ -239,6 +258,7 @@
         if (!builder) {
             return when.reject("Unknown projection: " + projectionName);
         }
+        console.log('earth.js buildGlobe()  projectionName and builder:"',projectionName+'"',builder)
         return when(builder(view));
     }
 
@@ -252,7 +272,9 @@
         //         this allows us to use the product for navigation and other state.
         var cancel = this.cancel;
         downloadsInProgress++;
+        // 加载products.js 文件,并调用 productsFor() ，configuration.attributes 的信息是 覆盖层和地理信息 的数据信息
         var loaded = when.map(products.productsFor(configuration.attributes), function(product) {
+            // load 加载的是 products.js FACTORIES.create() 返回对象的属性
             return product.load(cancel);
         });
         return when.all(loaded).then(function(products) {
@@ -300,9 +322,10 @@
         var coastline = d3.select(".coastline");
         var lakes = d3.select(".lakes");
         d3.selectAll("path").attr("d", path);  // do an initial draw -- fixes issue with safari
-
+        // 如果定义后，在地图上展示位置
         function drawLocationMark(point, coord) {
             // show the location on the map if defined
+            console.log('earth.js drawLocationMark fieldAgent.value():',fieldAgent.value())
             if (fieldAgent.value() && !fieldAgent.value().isInsideBoundary(point[0], point[1])) {
                 // UNDONE: Sometimes this is invoked on an old, released field, because new one has not been
                 //         built yet, causing the mark to not get drawn.
@@ -516,7 +539,7 @@
         }
 
         report.status("");
-
+        
         (function batchInterpolate() {
             try {
                 if (!cancel.requested) {
@@ -551,7 +574,9 @@
         var bounds = globe.bounds(view);
         // maxIntensity is the velocity at which particle color intensity is maximum
         var colorStyles = µ.windIntensityColorScale(INTENSITY_SCALE_STEP, grids.primaryGrid.particles.maxIntensity);
+        console.log('earth.js animate() colorStyles:',colorStyles)
         var buckets = colorStyles.map(function() { return []; });
+        console.log('earth.js animate() buckets:',buckets)
         var particleCount = Math.round(bounds.width * PARTICLE_MULTIPLIER);
         if (µ.isMobile()) {
             particleCount *= PARTICLE_REDUCTION;
@@ -712,6 +737,7 @@
     /**
      * Display the grid's validity date in the menu. Allow toggling between local and UTC time.
      */
+     // 菜单选项中(第一行Date)显示时间 
     function showDate(grids) {
         var date = new Date(validityDate(grids)), isLocal = d3.select("#data-date").classed("local");
         var formatted = isLocal ? µ.toLocalISO(date) : µ.toUTCISO(date);
@@ -722,6 +748,7 @@
     /**
      * Display the grids' types in the menu.
      */
+    // 展示菜单栏里Data(#data-layer), Source(#data-center)  属性值
     function showGridDetails(grids) {
         showDate(grids);
         var description = "", center = "";
@@ -791,6 +818,7 @@
      * The location may not be valid, in which case no callout is displayed. Display location data for both
      * the primary grid and overlay grid, performing interpolation when necessary.
      */
+     // point 是 (x,y) 坐标     coord 是 (lon,lat) 坐标
     function showLocationDetails(point, coord) {
         point = point || [];
         coord = coord || [];
@@ -866,6 +894,7 @@
 
     function reportSponsorClick(type) {
         if (ga) {
+            console.log('earth.js reportSponsorClick() ga:',ga)
             ga("send", "event", "sponsor", type);
         }
     }
@@ -874,9 +903,12 @@
      * Registers all event handlers to bind components and page elements together. There must be a cleaner
      * way to accomplish this...
      */
-    function init() {
-        report.status("Initializing...");
 
+    function init() {
+
+        report.status("Initializing...");
+        console.log('earth.js init() #sponsor-link:',d3.select("#sponsor-link"))
+        // d3.select(dom).on() 添加或删除事件监听器
         d3.select("#sponsor-link")
             .attr("target", µ.isEmbeddedInIFrame() ? "_new" : null)
             .on("click", reportSponsorClick.bind(null, "click"))
@@ -891,22 +923,25 @@
         d3.select("#scale")
             .attr("width", (d3.select("#menu").node().offsetWidth - label.offsetWidth) * 0.97)
             .attr("height", label.offsetHeight / 2);
-
+        console.log('earth.js init() #scale width:',d3.select("#scale").attr('width'))
         d3.select("#show-menu").on("click", function() {
+            // µ.isEmbeddedInIFrame() 为false时， 菜单选项不可点击
             if (µ.isEmbeddedInIFrame()) {
+                console.log('earth.js init() window.location.hash:',window.location.hash)
                 window.open("http://earth.nullschool.net/" + window.location.hash, "_blank");
             }
             else {
                 d3.select("#menu").classed("invisible", !d3.select("#menu").classed("invisible"));
             }
         });
-
+        // 判断是否为火狐浏览器
         if (µ.isFF()) {
             // Workaround FF performance issue of slow click behavior on map having thick coastlines.
             d3.select("#display").classed("firefox", true);
         }
 
         // Tweak document to distinguish CSS styling between touch and non-touch environments. Hacky hack.
+        // 貌似判断浏览器是否触屏
         if ("ontouchstart" in document.documentElement) {
             d3.select(document).on("touchstart", function() {});  // this hack enables :active pseudoclass
         }
@@ -915,18 +950,34 @@
         }
 
         // Bind configuration to URL bar changes.
+        // configuration.fetch() 如果模型从未填充数据时非常有用， 或者如果你想确保你有最新的服务器状态;http://www.css88.com/doc/backbone/#Model-fetch
         d3.select(window).on("hashchange", function() {
             log.debug("hashchange");
             configuration.fetch({trigger: "hashchange"});
         });
-
+        // 每次参数变化，都调用 输出变化 提示的信息
         configuration.on("change", report.reset);
 
-        meshAgent.listenTo(configuration, "change:topology", function(context, attr) {
-            meshAgent.submit(buildMesh, attr);
-        });
-
+        // 鼠标拖动 改变投影方式，传入地形数据 进入函数计算
+        // attr:  /data/earth-topo.json?v2
+        // console.log('buildMesh:',buildMesh)
+        // var init_num = 0
+        // if(init_num == 0){
+        //         console.log(init_num)
+            meshAgent.submit(buildMesh,'/data/earth-topo.json?v2') 
+        //     init_num+=1   
+        // }
+        
+        
+        // meshAgent.listenTo(configuration, "change:topology", function(context, attr) {
+        //     console.log('attr:',attr)
+        //     meshAgent.submit(buildMesh, attr);
+        // });
+        // 投影模式变化时
+        console.log('earth.js init() configuration:',configuration)
         globeAgent.listenTo(configuration, "change:projection", function(source, attr) {
+            // eg : project.attr: equirectangular
+            console.log('earth.js init() projection.attr:',attr);
             globeAgent.submit(buildGlobe, attr);
         });
 
@@ -934,15 +985,21 @@
             var changed = _.keys(configuration.changedAttributes()), rebuildRequired = false;
 
             // Build a new grid if any layer-related attributes have changed.
+            // _.intersection(arr1,arr2) 返回的是 changed 与 ["date", "hour", "param", "surface", "level"] 具有的公共元素的一个数组
             if (_.intersection(changed, ["date", "hour", "param", "surface", "level"]).length > 0) {
                 rebuildRequired = true;
             }
             // Build a new grid if the new overlay type is different from the current one.
             var overlayType = configuration.get("overlayType") || "default";
+            // _.indexOf() 返回元素在数组的位置，如果没有该元素返回 false
             if (_.indexOf(changed, "overlayType") >= 0 && overlayType !== "off") {
+                // gridAgent.value() == newAgent(n).value(n) ,由于此处没有传入值，所以 grids = {}
                 var grids = (gridAgent.value() || {}), primary = grids.primaryGrid, overlay = grids.overlayGrid;
+                console.log('earth.js init() grids:',grids)
                 if (!overlay) {
                     // Do a rebuild if we have no overlay grid.
+                    // 执行这步
+                    console.log('yes,overlay is undefined')
                     rebuildRequired = true;
                 }
                 else if (overlay.type !== overlayType && !(overlayType === "default" && primary === overlay)) {
@@ -950,7 +1007,7 @@
                     rebuildRequired = true;
                 }
             }
-
+            // 重新生成整个网格
             if (rebuildRequired) {
                 gridAgent.submit(buildGrids);
             }
@@ -1116,6 +1173,7 @@
 
     function start() {
         // Everything is now set up, so load configuration from the hash fragment and kick off change events.
+        // configuration.fetch() 如果模型从未填充数据时非常有用， 或者如果你想确保你有最新的服务器状态;http://www.css88.com/doc/backbone/#Model-fetch
         configuration.fetch();
     }
 

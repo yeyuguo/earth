@@ -6,6 +6,7 @@
  *
  * https://github.com/cambecc/earth
  */
+ // 风流动数据 绘制函数
 var products = function() {
     "use strict";
 
@@ -61,6 +62,8 @@ var products = function() {
      * Returns a date for the chronologically next or previous GFS data layer. How far forward or backward in time
      * to jump is determined by the step. Steps of ±1 move in 3-hour jumps, and steps of ±10 move in 24-hour jumps.
      */
+
+     // utc时间转其他时区时间
     function gfsStep(date, step) {
         var offset = (step > 1 ? 8 : step < -1 ? -8 : step) * 3, adjusted = new Date(date);
         adjusted.setHours(adjusted.getHours() + offset);
@@ -106,7 +109,7 @@ var products = function() {
             return result;
         }
     }
-
+// d3.set(_.keys(FACTORIES))
     var FACTORIES = {
 
         "wind": {
@@ -679,10 +682,22 @@ var products = function() {
     }
 
     function productsFor(attributes) {
+        console.log('products.js productsFor() attributes:',attributes)
+        // attr ==> attributes: {Object,date: "current",hour: "",level: "level",orientation: "-240.00,0.00,109",overlayType: "default",param: "wind",projection: "equirectangular",showGridPoints: false,surface: "surface",topology: "/data/earth-topo.json?v2"}
         var attr = _.clone(attributes), results = [];
+        // FACTORIES: Object {wind: Object, temp: Object, relative_humidity: Object, air_density: Object, wind_power_density: Object…}
+        console.log('products.js productsFor() FACTORIES:',FACTORIES)
         _.values(FACTORIES).forEach(function(factory) {
+            // console.log(factory)
+            console.log('products.js productsFor() factory.matches(attr):',factory.matches(attr))
+            // obj.matches(attrs) 可以用来辨别给定的对象是否匹配 attrs 指定键/值属性 #http://www.css88.com/doc/underscore/#matcher
             if (factory.matches(attr)) {
+                // 调用菜单选项里 Overlay 的函数加载不同的气象元素,wind temp 或者是 RH
                 results.push(factory.create(attr));
+                console.log('products.js productsFor() attr:',attr)
+                console.log('products.js productsFor() factory:',factory)
+                console.log('products.js productsFor() factory.create(attr):',factory.create(attr))
+
             }
         });
         return results.filter(µ.isValue);
